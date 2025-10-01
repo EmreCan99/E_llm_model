@@ -59,7 +59,8 @@ class Website:
 link_system_prompt = "You are provided with a list of link from a webpage." \
     " Please decide which links are relevant for the brochure such as the links " \
     "about; about us, careers/jobs, our team etc. Also if there are posts or stories " \
-    "in the website bring few recent posts. Some links might be given as " \
+    "in the website bring few recent posts. Ignore navigation related links. " \
+    "Do not bring more then 5 links. Some links might be given as " \
     "relative links and you should respond in full http format as JSON as in this example: \n"
 link_system_prompt += """
 {
@@ -100,5 +101,55 @@ def get_links(url):
 # %%
 result = get_links("https://brainofnatalia.blogspot.com/")
 
-# %%
+# %% ---------------------------------
 
+# %%
+def get_all_the_details(url):
+    website = Website(url)
+    results = "Landing page:\n"
+    results += website.get_contents()
+    links = get_links(website.url)
+    print("the selected links", links)
+    for link in links["links"]:
+        results += f"Website type: {link['type']} \n\n"
+        results += Website(link["url"]).get_contents()
+    return results
+
+# %%
+result = get_all_the_details("https://huggingface.co/")
+# %%
+system_prompt = "You are an assistant that analysis a list of relevant links from a company website " \
+    "and provide a short brochure for the potention investors, recruits or anyone interested in this company." \
+    "Provide also general inforamtion about the company. Respond in Markdown"
+
+# %%
+def get_brochure_user_propmt(company_name, url):
+    user_prompt = f"you are looking at a company called {company_name}. \n"
+    user_prompt += "here are the details about the landing page and the " \
+    "contents of the relevant links in that website. Use these to create" \
+    "a short brochure of this company in markdown\n"
+    user_prompt += get_all_the_details(url)
+    if len(user_prompt) < 5_000:
+        print("user_prompt is short enough")
+    else:
+        user_prompt = user_prompt[:5_000]
+        print("user_prompt is truncated")
+    return user_prompt
+
+        
+# %%
+get_brochure_user_propmt("huggingface", "https://huggingface.co/")
+# %%
+def create_brochure(company_name, url):
+    response = openai.chat.completions.create(
+        model = MODEL,
+        messages = [
+            {"role": "system", "content":system_prompt},
+            {"role": "user", "content":get_brochure_user_propmt(company_name, url)}
+        ])
+    results = response.choices[0].message.content
+    return Markdown(results)
+
+# %%
+sonuc = create_brochure("Huggingface", "https://huggingface.co/")
+# %%
